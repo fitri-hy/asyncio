@@ -3,35 +3,52 @@ namespace AsyncIO;
 
 class Timer
 {
-    private static array $timers = [];
+    private static array $timeouts = [];
+    private static array $intervals = [];
     private static int $idCounter = 0;
 
-    public static function setTimeout(int $ms, callable $callback){
+    public static function setTimeout(int $ms, callable $callback): int {
         $id = self::$idCounter++;
-        self::$timers[$id] = ['type'=>'timeout','time'=>microtime(true)+$ms/1000,'callback'=>$callback];
-        Async::add(fn()=> self::check($id));
+        self::$timeouts[$id] = [
+            'at' => microtime(true) + $ms/1000,
+            'cb' => $callback
+        ];
         return $id;
     }
 
-    public static function setInterval(int $ms, callable $callback){
+    public static function setInterval(int $ms, callable $callback): int {
         $id = self::$idCounter++;
-        self::$timers[$id] = ['type'=>'interval','time'=>microtime(true)+$ms/1000,'ms'=>$ms,'callback'=>$callback];
-        Async::add(fn()=> self::check($id));
+        self::$intervals[$id] = [
+            'interval' => $ms/1000,
+            'next' => microtime(true) + $ms/1000,
+            'cb' => $callback
+        ];
         return $id;
     }
 
-    public static function cancel(int $id){ unset(self::$timers[$id]); }
+    public static function cancel(int $id): void {
+        unset(self::$timeouts[$id], self::$intervals[$id]);
+    }
 
-    private static function check(int $id){
-        if(!isset(self::$timers[$id])) return;
-        $t = self::$timers[$id];
+    public static function tick(): void {
         $now = microtime(true);
-        if($now >= $t['time']){
-            $t['callback']();
-            if($t['type']=='interval'){
-                self::$timers[$id]['time']=$now+$t['ms']/1000;
-                Async::add(fn()=> self::check($id));
-            }else unset(self::$timers[$id]);
-        }else Async::add(fn()=> self::check($id));
+
+        foreach (self::$timeouts as $id => $t) {
+            if ($now >= $t['at']) {
+                Async::add($t['cb']);
+                unset(self::$timeouts[$id]);
+            }
+        }
+
+        foreach (self::$intervals as $id => &$t) {
+            if ($now >= $t['next']) {
+                Async::add($t['cb']);
+                $t['next'] = $now + $t['interval'];
+            }
+        }
+    }
+
+    public static function isIdle(): bool {
+        return empty(self::$timeouts) && empty(self::$intervals);
     }
 }

@@ -11,24 +11,24 @@ AsyncIO provides a modern way to run **non-blocking tasks** in PHP, including fi
 ## 📦 Key Features
 
 | Module      | Function / Description                                                                 |
-| :---------- | :------------------------------------------------------------------------------------ |
-| **Async**   | Core engine for running async tasks. Menangani scheduling, hooks, dan error handling. |
-| **Task**    | Wrapper for creating async tasks with name, priority, and cancellation.              |
-| **File**    | Async file I/O: read, write, append, stream, dan file watcher.                        |
-| **Worker**  | Worker pool untuk CPU-bound parallel tasks, termasuk scheduler.                       |
-| **Timer**   | Async `setTimeout` & `setInterval` dengan callback.                                    |
-| **Utils**   | Helper functions seperti `asyncMap`, `asyncFilter`, dsb.                               |
-| **Promise** | Promise-style chaining: `all`, `race`, `any`, `resolveNow`.                            |
-| **Http**    | Async HTTP requests (`requestAsync`) + support hooks before/after.                     |
-| **DB**      | Async database queries (MySQL, PostgreSQL, SQLite, dsb.)                               |
-| **Logger**  | Centralized logging system, mendukung level info, error, debug.                        |
+| :---------- | :------------------------------------------------------------------------------------- |
+| **Async**   | Core engine for running async tasks. Handles scheduling, hooks, and error handling.    |
+| **Task**    | Wrapper for creating async tasks with name, priority, and cancellation.                |
+| **File**    | Async file I/O: read, write, append, stream, and file watcher.                         |
+| **Worker**  | Worker pool for CPU-bound parallel tasks, including scheduler.                         |
+| **Timer**   | Async `setTimeout` & `setInterval` with callback.                                      |
+| **Utils**   | Helper functions such as `asyncMap`, `asyncFilter`, etc.                               |
+| **Promise** | Promise-style chaining: `then`, `catch`, `all`, `race`, `any`, `resolveNow`.           |
+| **Http**    | Async HTTP requests (`requestAsync`) + Promise-based CRUD support, hooks before/after. |
+| **DB**      | Async database queries (MySQL, PostgreSQL, SQLite, etc.).                              |
+| **Logger**  | Centralized logging system with support for info, error, and debug levels.             |
 
 ---
 
 ## 🚀 Requirements
 
-- PHP 8.1+
-- Composer
+* PHP 8.1+
+* Composer
 
 ---
 
@@ -36,7 +36,7 @@ AsyncIO provides a modern way to run **non-blocking tasks** in PHP, including fi
 
 ```bash
 composer require fhylabs/asyncio
-````
+```
 
 ---
 
@@ -49,9 +49,7 @@ use AsyncIO\Async;
 use AsyncIO\Logger;
 
 Async::add(fn()=> Logger::log("[Async] Task executed"));
-
-// Run all async tasks
-Async::run();
+Async::run(); // Run all async tasks
 ```
 
 * Use `Async::add()` to add tasks.
@@ -75,7 +73,7 @@ $task = new Task(function(){
 Async::add($task->callable);
 ```
 
-* Priority determines the order of execution.
+* Priority determines execution order.
 * Tasks can be canceled with `$task->cancel()`.
 
 ---
@@ -87,14 +85,14 @@ use AsyncIO\Worker;
 use AsyncIO\Logger;
 
 Worker::setConcurrency(3);
+
 Worker::add(fn()=> Logger::log("[Worker] CPU task completed"));
 Worker::schedule(fn()=> Logger::log("[Scheduler] Periodic tasks"), 5000);
 
-// Run all workers
-Worker::runQueue();
+Worker::runQueue(); // Run CPU-bound tasks
 ```
 
-* Use for heavy-duty tasks to keep async loops non-blocking.
+* Use Worker for heavy tasks to keep the async loop non-blocking.
 
 ---
 
@@ -104,9 +102,11 @@ Worker::runQueue();
 use AsyncIO\Timer;
 use AsyncIO\Logger;
 
-Timer::setTimeout(2000, fn()=> Logger::log("[Timer] 2 seconds to finish"));
-Timer::setInterval(5000, fn()=> Logger::log("[Interval] Every 5 second"));
+Timer::setTimeout(2000, fn()=> Logger::log("[Timer] 2 seconds passed"));
+Timer::setInterval(5000, fn()=> Logger::log("[Interval] Every 5 seconds"));
 ```
+
+* Non-blocking delays and intervals.
 
 ---
 
@@ -117,28 +117,39 @@ use AsyncIO\File;
 use AsyncIO\Logger;
 
 File::readAsync("file.txt", fn($c)=> Logger::log($c));
-File::appendAsync("file.txt", "\nTambah baris", fn($ok)=> Logger::log($ok ? "Append OK" : "Failed"));
+File::appendAsync("file.txt", "\nAdd line", fn($ok)=> Logger::log($ok ? "Append OK" : "Failed"));
 File::readStreamAsync("file.txt", fn($chunk)=> Logger::log("[Stream] Chunk size: ".strlen($chunk)));
 File::watchFile("file.txt", fn($p)=> Logger::log("File changed: $p"));
 ```
 
 ---
 
-### 6. Http – Async Request + Hooks
+### 6. Http – Async & Promise-based CRUD
 
 ```php
 use AsyncIO\Http;
 use AsyncIO\Async;
 use AsyncIO\Logger;
 
+// Hooks
 Async::addHook('before', fn($t)=> Logger::log("[Hook Before] HTTP task"));
 Async::addHook('after', fn($t)=> Logger::log("[Hook After] HTTP task"));
 
-Async::add(fn()=> Http::requestAsync(
-    ['https://jsonplaceholder.typicode.com/todos/1'],
-    ['method'=>'GET','timeout'=>5],
-    fn($res)=> Logger::log("[HTTP] Got ".count($res)." responses")
-));
+// Promise CRUD Example
+Async::add(function(){
+    Http::requestPromise(
+        ['https://jsonplaceholder.typicode.com/posts'],
+        ['method'=>'POST','headers'=>['Content-Type: application/json'],'body'=>json_encode(['title'=>'foo','body'=>'bar','userId'=>1])]
+    )
+    ->then(fn($res)=> Logger::log("[POST] ".substr(current($res),0,50)))
+    ->then(fn($res)=> Http::requestPromise(['https://jsonplaceholder.typicode.com/posts/1'], ['method'=>'GET']))
+    ->then(fn($res)=> Logger::log("[GET] ".substr(current($res),0,50)))
+    ->then(fn($res)=> Http::requestPromise(['https://jsonplaceholder.typicode.com/posts/1'], ['method'=>'PUT','headers'=>['Content-Type: application/json'],'body'=>json_encode(['id'=>1,'title'=>'updated','body'=>'updated','userId'=>1])]))
+    ->then(fn($res)=> Logger::log("[PUT] ".substr(current($res),0,50)))
+    ->then(fn($res)=> Http::requestPromise(['https://jsonplaceholder.typicode.com/posts/1'], ['method'=>'DELETE']))
+    ->then(fn($res)=> Logger::log("[DELETE] Done"))
+    ->catch(fn($e)=> Logger::log("[HTTP Error] ".$e->getMessage()));
+});
 ```
 
 ---
@@ -158,6 +169,8 @@ $db->queryAsync("SELECT id,name FROM users LIMIT 3", fn($res)=>{
     foreach($res as $row) Logger::log("[DB] {$row['id']} - {$row['name']}");
 });
 ```
+
+* Non-blocking database queries.
 
 ---
 
@@ -188,7 +201,7 @@ Promise::race([$p1,$p2], fn($winner)=> Logger::log("[Race] $winner"));
 
 ---
 
-### 10. Logger – Consistent Logging
+### 10. Logger – Centralized Logging
 
 ```php
 use AsyncIO\Logger;
@@ -201,11 +214,11 @@ Logger::log("[INFO] Standard log messages");
 ### 🔹 Best Practices
 
 * Add all tasks before `Async::run()`.
-* Use `Worker` for CPU-bound tasks to keep async loops non-blocking.
-* Use `Timer` for delays/intervals.
-* Use `Task` with priority to execute important tasks first.
-* The `before` & `after` hooks can be applied to Http tasks or other tasks.
-* Logger is used for output consistency and debugging.
+* Use `Worker` for CPU-bound tasks to keep the async loop non-blocking.
+* Use `Timer` for delays or intervals.
+* Use `Task` with priority for important tasks.
+* Use `before` & `after` hooks for HTTP or other async tasks.
+* Logger ensures consistent output and debugging.
 
 ---
 

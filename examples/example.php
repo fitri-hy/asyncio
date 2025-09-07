@@ -74,17 +74,49 @@ Utils::asyncMap([10,20,30], function($n,$done){
     Logger::log("[Utils] Doubled values: ".implode(",", $res));
 });
 
-// ================= Promise Example =================
-$p1 = new Promise(function($resolve,$reject){
-    Timer::setTimeout(1000, fn() => $resolve("Promise 1 resolved"));
-});
+// ================= Promise CRUD (JSONPlaceholder) =================
 
-$p2 = new Promise(function($resolve,$reject){
-    Timer::setTimeout(2000, fn() => $resolve("Promise 2 resolved"));
-});
+Async::add(function(){
 
-Promise::all([$p1,$p2], fn($results) => Logger::log("[Promise all] ".implode(", ", $results)));
-Promise::race([$p1,$p2], fn($winner) => Logger::log("[Promise race] $winner"));
+    // CREATE (POST)
+    Http::requestPromise(
+        ['https://jsonplaceholder.typicode.com/posts'],
+        [
+            'method'=>'POST',
+            'headers'=>['Content-Type: application/json'],
+            'body'=>json_encode(['title'=>'foo','body'=>'bar','userId'=>1])
+        ]
+    )
+    ->then(function($res){
+        Logger::log("[POST] ".substr(current($res),0,50));
+        // READ after POST
+        return Http::requestPromise(['https://jsonplaceholder.typicode.com/posts/1'], ['method'=>'GET']);
+    })
+    ->then(function($res){
+        Logger::log("[GET] ".substr(current($res),0,50));
+        // UPDATE
+        return Http::requestPromise(
+            ['https://jsonplaceholder.typicode.com/posts/1'],
+            [
+                'method'=>'PUT',
+                'headers'=>['Content-Type: application/json'],
+                'body'=>json_encode(['id'=>1,'title'=>'updated','body'=>'updated','userId'=>1])
+            ]
+        );
+    })
+    ->then(function($res){
+        Logger::log("[PUT] ".substr(current($res),0,50));
+        // DELETE
+        return Http::requestPromise(['https://jsonplaceholder.typicode.com/posts/1'], ['method'=>'DELETE']);
+    })
+    ->then(function($res){
+        Logger::log("[DELETE] Done");
+    })
+    ->catch(function($e){
+        Logger::log("[HTTP Error] ".$e->getMessage());
+    });
+
+});
 
 // ================= Database Async =================
 class MyDB extends DB {
@@ -94,47 +126,37 @@ class MyDB extends DB {
 }
 
 $db = new MyDB();
-$db->queryAsync("SELECT id,name FROM users LIMIT 3", function($res){
+
+// Query async
+$db->queryAsync("SELECT id, name FROM users LIMIT 3", function($res){
     foreach($res as $row){
         Logger::log("[DB] {$row['id']} - {$row['name']}");
     }
 });
 
-// ================= HTTP Task =================
-$httpTask = function(){
-    Http::requestAsync(
-        ['https://jsonplaceholder.typicode.com/todos/2'],
-        ['timeout'=>5,'method'=>'GET'],
-        fn($res) => Logger::log("[HTTP] Got ".count($res)." responses")
-    );
-};
-Async::add($httpTask);
-
-// ================= Task =================
-// Single task
+// ================= Single Task =================
 $singleTask = new Task(function(){
     Logger::log("[Task] Start single task...");
     Timer::setTimeout(5000, function(){
         Logger::log("[Task] Finish single task after 5 seconds");
     });
 }, "singleTask", 1);
+
 Async::add($singleTask->callable);
 
-// Multi task
-$multiTasks = [];
+// ================= Multi Task =================
 for($i=1; $i<=3; $i++){
-    $multiTasks[] = new Task(function() use ($i){
+    $t = new Task(function() use ($i){
         Logger::log("[Task-$i] Start multi task...");
         $delay = rand(2000,5000);
         Timer::setTimeout($delay, function() use ($i, $delay){
             Logger::log("[Task-$i] Finish multi task after {$delay} ms");
         });
     }, "task-$i", $i);
-}
-foreach($multiTasks as $t){
+
     Async::add($t->callable);
 }
 
 // ================= Run Worker Queue + Async Engine =================
 Worker::runQueue();  // run CPU-bound tasks
-Async::run();        // run async engine
+Async::run();        // run async engine, otomatis tick Timer/Worker/HTTP/Promise
