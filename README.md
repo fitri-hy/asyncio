@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./examples/icon.png" alt="icon.png" />
+  <img src="./examples/icon.png" alt="icon.png" width="150" />
 </div>
 
 # AsyncIO – PHP Asynchronous I/O Library
