@@ -4,13 +4,13 @@ namespace AsyncIO;
 class File {
 
     public static function readAsync(string $path, callable $callback){
-        Async::add(function() use ($path,$callback){
+        Async::add(function() use ($path, $callback){
             if(!file_exists($path)){
                 Logger::log("[File Error] File $path not found",'ERROR');
                 $callback(null);
                 return;
             }
-            $content=file_get_contents($path);
+            $content = file_get_contents($path);
             $callback($content);
         });
     }
@@ -18,7 +18,7 @@ class File {
     public static function readStreamAsync(string $path, callable $chunkCallback, int $chunkSize=8192){
         Async::add(function() use ($path,$chunkCallback,$chunkSize){
             if(!file_exists($path)){
-                Logger::log("[File Error]File $path not found",'ERROR');
+                Logger::log("[File Error] File $path not found",'ERROR');
                 return;
             }
             $handle=fopen($path,'r');
@@ -35,8 +35,25 @@ class File {
 
     public static function writeStreamAsync(string $path, string $data, callable $callback=null){
         Async::add(function() use ($path,$data,$callback){
-            $res=file_put_contents($path,$data);
-            if($callback) $callback($res);
+            try {
+                $res = file_put_contents($path, $data);
+                if($callback) $callback($res !== false);
+            } catch (\Exception $e) {
+                Logger::log("[File Error] ".$e->getMessage(),'ERROR');
+                if($callback) $callback(false);
+            }
+        });
+    }
+
+    public static function appendAsync(string $path, string $data, callable $callback=null){
+        Async::add(function() use ($path, $data, $callback){
+            try {
+                $res = file_put_contents($path, $data, FILE_APPEND);
+                if($callback) $callback($res !== false);
+            } catch (\Exception $e) {
+                Logger::log("[File Error] ".$e->getMessage(),'ERROR');
+                if($callback) $callback(false);
+            }
         });
     }
 
