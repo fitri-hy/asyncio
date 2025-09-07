@@ -1,0 +1,20 @@
+{
+  "name": "fhylabs/asyncio",
+  "description": "PHP Asynchronous I/O Library",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Fitri HY",
+      "email": "fitri-hy@fhylabs.com"
+    }
+  ],
+  "require": {
+    "php": ">=8.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "AsyncIO\\": "src/"
+    }
+  }
+}
