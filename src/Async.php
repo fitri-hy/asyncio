@@ -55,8 +55,8 @@ class Async {
         return self::add($wrapper, $priority, $name);
     }
 
-    public static function run(int $tickMs = 10){
-        while (true) {
+    public static function run(int $tickMs = 10, bool $exitWhenIdle = true){
+        do {
             if (!empty(self::$tasks)) {
                 $task = array_shift(self::$tasks);
                 if ($task->cancelled) continue;
@@ -95,11 +95,13 @@ class Async {
             }
 
             if (empty(self::$tasks) && Timer::isIdle()) {
-                if (!class_exists(Worker::class) || Worker::isIdle()) {
-                    usleep($tickMs * 1000);
-                }
+                if ($exitWhenIdle) break;
+                usleep($tickMs * 1000);
+            } else {
+                usleep($tickMs * 1000);
             }
-        }
+
+        } while (true);
     }
 
     private static function filterMatch($filter, Task $task): bool {
