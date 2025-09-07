@@ -1,4 +1,5 @@
 {
+  "version": "1.0.2"
   "name": "fhylabs/asyncio",
   "description": "PHP Asynchronous I/O Library",
   "type": "library",

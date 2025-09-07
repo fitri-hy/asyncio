@@ -159,4 +159,4 @@ for($i=1; $i<=3; $i++){
 
 // ================= Run Worker Queue + Async Engine =================
 Worker::runQueue();  // run CPU-bound tasks
-Async::run();        // run async engine, otomatis tick Timer/Worker/HTTP/Promise
+Async::run();        // run async engine
